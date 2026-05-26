@@ -14,6 +14,7 @@
 #include <status.h>
 #include <types.h>
 #include <parser.h>
+#include <duration.h>
 #include <rules.h>
 #include <config.h>
 #include <config_reader.h>
@@ -659,6 +660,57 @@ static bool od_config_reader_number64(od_config_reader_t *reader,
 	return true;
 }
 
+static bool od_config_reader_duration_ms_int(od_config_reader_t *reader,
+					     int *out_ms)
+{
+	od_token_t tok;
+	uint64_t us;
+
+	if (od_parser_next_duration(&reader->parser, &tok) !=
+		    OD_PARSER_DURATION ||
+	    od_duration_parse_ms(tok.value.string.pointer,
+				 (size_t)tok.value.string.size, &us) < 0) {
+		od_config_reader_error(reader, &tok, "expected 'number'");
+		return false;
+	}
+	*out_ms = (int)(us / 1000ULL);
+	return true;
+}
+
+static bool od_config_reader_duration_s_int(od_config_reader_t *reader,
+					    int *out_s)
+{
+	od_token_t tok;
+	uint64_t us;
+
+	if (od_parser_next_duration(&reader->parser, &tok) !=
+		    OD_PARSER_DURATION ||
+	    od_duration_parse_s(tok.value.string.pointer,
+				(size_t)tok.value.string.size, &us) < 0) {
+		od_config_reader_error(reader, &tok, "expected 'number'");
+		return false;
+	}
+	*out_s = (int)(us / 1000000ULL);
+	return true;
+}
+
+static bool od_config_reader_duration_s_u64(od_config_reader_t *reader,
+					    uint64_t *out_us)
+{
+	od_token_t tok;
+	uint64_t us;
+
+	if (od_parser_next_duration(&reader->parser, &tok) !=
+		    OD_PARSER_DURATION ||
+	    od_duration_parse_s(tok.value.string.pointer,
+				(size_t)tok.value.string.size, &us) < 0) {
+		od_config_reader_error(reader, &tok, "expected 'number'");
+		return false;
+	}
+	*out_us = us;
+	return true;
+}
+
 static bool
 od_config_reader_target_session_attrs(od_config_reader_t *reader,
 				      od_target_session_attrs_t *out)
@@ -1153,7 +1205,7 @@ static int od_config_reader_listen(od_config_reader_t *reader)
 			continue;
 		/* client_login_timeout */
 		case OD_LCLIENT_LOGIN_TIMEOUT:
-			if (!od_config_reader_number(
+			if (!od_config_reader_duration_ms_int(
 				    reader, &listen->client_login_timeout)) {
 				return NOT_OK_RESPONSE;
 			}
@@ -2059,7 +2111,7 @@ static int od_config_reader_rule_settings(od_config_reader_t *reader,
 			continue;
 		/* ldap_pool_timeout */
 		case OD_LLDAPPOOL_TIMEOUT:
-			if (!od_config_reader_number(
+			if (!od_config_reader_duration_ms_int(
 				    reader, &rule->ldap_pool_timeout)) {
 				return NOT_OK_RESPONSE;
 			}
@@ -2109,8 +2161,8 @@ static int od_config_reader_rule_settings(od_config_reader_t *reader,
 			continue;
 		/* pool_timeout */
 		case OD_LPOOL_TIMEOUT:
-			if (!od_config_reader_number(reader,
-						     &rule->pool->timeout)) {
+			if (!od_config_reader_duration_ms_int(
+				    reader, &rule->pool->timeout)) {
 				return NOT_OK_RESPONSE;
 			}
 			continue;
@@ -2200,21 +2252,18 @@ static int od_config_reader_rule_settings(od_config_reader_t *reader,
 			continue;
 		/* pool_client_idle_timeout */
 		case OD_LPOOL_CLIENT_IDLE_TIMEOUT:
-			if (!od_config_reader_number64(
+			if (!od_config_reader_duration_s_u64(
 				    reader, &rule->pool->client_idle_timeout)) {
 				return NOT_OK_RESPONSE;
 			}
-			rule->pool->client_idle_timeout *= interval_usec;
 			continue;
 		/* pool_idle_in_transaction_timeout */
 		case OD_LPOOL_IDLE_IN_TRANSACTION_TIMEOUT:
-			if (!od_config_reader_number64(
+			if (!od_config_reader_duration_s_u64(
 				    reader,
 				    &rule->pool->idle_in_transaction_timeout)) {
 				return NOT_OK_RESPONSE;
 			}
-			rule->pool->idle_in_transaction_timeout *=
-				interval_usec;
 			continue;
 		/* shared_pool */
 		case OD_LSHARED_POOL: {
@@ -2380,8 +2429,8 @@ static int od_config_reader_rule_settings(od_config_reader_t *reader,
 			}
 			continue;
 		case OD_LCATCHUP_TIMEOUT:
-			if (!od_config_reader_number(reader,
-						     &rule->catchup_timeout)) {
+			if (!od_config_reader_duration_s_int(
+				    reader, &rule->catchup_timeout)) {
 				return NOT_OK_RESPONSE;
 			}
 			continue;
@@ -3306,7 +3355,7 @@ static int od_config_reader_parse(od_config_reader_t *reader,
 			continue;
 		/* graceful_shutdown_timeout_ms */
 		case OD_LGRACEFUL_SHUTDOWN_TIMEOUT_MS:
-			if (!od_config_reader_number(
+			if (!od_config_reader_duration_ms_int(
 				    reader,
 				    &config->graceful_shutdown_timeout_ms)) {
 				goto error;
@@ -3521,7 +3570,7 @@ static int od_config_reader_parse(od_config_reader_t *reader,
 			continue;
 		/* backend_connect_timeout_ms */
 		case OD_LBACKEND_CONNECT_TIMEOUT_MS:
-			if (!od_config_reader_number(
+			if (!od_config_reader_duration_ms_int(
 				    reader,
 				    &config->backend_connect_timeout_ms)) {
 				goto error;
@@ -3537,7 +3586,7 @@ static int od_config_reader_parse(od_config_reader_t *reader,
 
 		/* keepalive_usr_timeout */
 		case OD_LKEEPALIVE_USR_TIMEOUT:
-			if (!od_config_reader_number(
+			if (!od_config_reader_duration_ms_int(
 				    reader, &config->keepalive_usr_timeout)) {
 				goto error;
 			}
